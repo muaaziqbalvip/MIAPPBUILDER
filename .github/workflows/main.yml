@@ -7,6 +7,9 @@ on:
     branches: [ "main", "master" ]
   workflow_dispatch:
 
+env:
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: 'true'
+
 jobs:
   build:
     name: Build Android APK
@@ -26,35 +29,22 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Setup Official Gradle System
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: '8.2.2'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
-      - name: Fix Missing Gradle Wrapper JAR & Permissions
+      - name: Prepare Gradle Wrapper in android-app
         working-directory: ./android-app
         run: |
           mkdir -p gradle/wrapper
-          if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
-            echo "Downloading official gradle-wrapper.jar..."
-            curl -sLo gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.2.0/gradle/wrapper/gradle-wrapper.jar || true
-          fi
-          # If still not present, regenerate wrapper using system gradle
-          if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
-            gradle wrapper --gradle-version 8.2.2
-          fi
+          curl -sLo gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.2.1/gradle/wrapper/gradle-wrapper.jar
           chmod +x gradlew || true
 
-      - name: Build APK (with Fallback to System Gradle)
+      - name: Build Debug APK
         working-directory: ./android-app
         run: |
-          if [ -f "gradle/wrapper/gradle-wrapper.jar" ]; then
-            ./gradlew assembleDebug --stacktrace --no-daemon
-          else
-            gradle assembleDebug --stacktrace --no-daemon
-          fi
+          ./gradlew assembleDebug --stacktrace --no-daemon
 
-      - name: Upload Debug APK
+      - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: MINEXUS-TV-Debug-APK
