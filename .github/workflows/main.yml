@@ -9,11 +9,11 @@ on:
 
 jobs:
   build:
-    name: Build Android APK (from android-app folder)
+    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -26,41 +26,39 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Ensure Gradle Wrapper & Permissions in android-app
+      - name: Setup Official Gradle System
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.2.2'
+
+      - name: Fix Missing Gradle Wrapper JAR & Permissions
         working-directory: ./android-app
         run: |
-          # If gradlew is not found or not executable, create wrapper
-          if [ ! -f "gradlew" ]; then
-            echo "Generating Gradle wrapper..."
-            gradle wrapper
+          mkdir -p gradle/wrapper
+          if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
+            echo "Downloading official gradle-wrapper.jar..."
+            curl -sLo gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.2.0/gradle/wrapper/gradle-wrapper.jar || true
           fi
-          chmod +x gradlew
+          # If still not present, regenerate wrapper using system gradle
+          if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
+            gradle wrapper --gradle-version 8.2.2
+          fi
+          chmod +x gradlew || true
 
-      - name: Build Debug APK with Gradle
+      - name: Build APK (with Fallback to System Gradle)
         working-directory: ./android-app
         run: |
-          ./gradlew assembleDebug --stacktrace --no-daemon
+          if [ -f "gradle/wrapper/gradle-wrapper.jar" ]; then
+            ./gradlew assembleDebug --stacktrace --no-daemon
+          else
+            gradle assembleDebug --stacktrace --no-daemon
+          fi
 
-      - name: Upload APK to GitHub Artifacts
+      - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
           name: MINEXUS-TV-Debug-APK
           path: |
             android-app/app/build/outputs/apk/debug/*.apk
             **/build/outputs/apk/debug/*.apk
-          retention-days: 30
-
-      - name: Build Release APK (Unsigned / Release Mode)
-        working-directory: ./android-app
-        run: |
-          ./gradlew assembleRelease --stacktrace --no-daemon || echo "Release build step skipped or completed"
-
-      - name: Upload Release APK Artifact
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: MINEXUS-TV-Release-APK
-          path: |
-            android-app/app/build/outputs/apk/release/*.apk
-            **/build/outputs/apk/release/*.apk
           retention-days: 30
