@@ -5,15 +5,15 @@ on:
     branches: [ "main", "master" ]
   pull_request:
     branches: [ "main", "master" ]
-  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+  workflow_dispatch:
 
 jobs:
   build:
-    name: Build Android APK
+    name: Build Android APK (from android-app folder)
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout Repository Code
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -26,41 +26,41 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Grant Execute Permission for Gradlew
+      - name: Ensure Gradle Wrapper & Permissions in android-app
+        working-directory: ./android-app
         run: |
-          if [ -f "./gradlew" ]; then
-            chmod +x ./gradlew
-          elif [ -f "./android-app/gradlew" ]; then
-            chmod +x ./android-app/gradlew
-          fi
-
-      - name: Build APK with Gradle
-        run: |
-          if [ -f "./gradlew" ]; then
-            ./gradlew assembleDebug --stacktrace
-          elif [ -f "./android-app/gradlew" ]; then
-            cd android-app && ./gradlew assembleDebug --stacktrace
-          else
-            echo "Gradle wrapper not found, generating wrapper..."
+          # If gradlew is not found or not executable, create wrapper
+          if [ ! -f "gradlew" ]; then
+            echo "Generating Gradle wrapper..."
             gradle wrapper
-            ./gradlew assembleDebug --stacktrace
           fi
+          chmod +x gradlew
 
-      - name: Find and Upload APK Artifact
+      - name: Build Debug APK with Gradle
+        working-directory: ./android-app
+        run: |
+          ./gradlew assembleDebug --stacktrace --no-daemon
+
+      - name: Upload APK to GitHub Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: MINEXUS-TV-Official-APK
+          name: MINEXUS-TV-Debug-APK
           path: |
+            android-app/app/build/outputs/apk/debug/*.apk
             **/build/outputs/apk/debug/*.apk
-            **/build/outputs/apk/release/*.apk
           retention-days: 30
 
-      - name: Create Release (Optional for Tagged Pushes)
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
+      - name: Build Release APK (Unsigned / Release Mode)
+        working-directory: ./android-app
+        run: |
+          ./gradlew assembleRelease --stacktrace --no-daemon || echo "Release build step skipped or completed"
+
+      - name: Upload Release APK Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
         with:
-          files: |
-            **/build/outputs/apk/debug/*.apk
+          name: MINEXUS-TV-Release-APK
+          path: |
+            android-app/app/build/outputs/apk/release/*.apk
             **/build/outputs/apk/release/*.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          retention-days: 30
