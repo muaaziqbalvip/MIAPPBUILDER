@@ -32,12 +32,17 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Prepare Gradle Wrapper in android-app
+      - name: Inject AndroidX & Gradle Properties
         working-directory: ./android-app
         run: |
           mkdir -p gradle/wrapper
           curl -sLo gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.2.1/gradle/wrapper/gradle-wrapper.jar
           chmod +x gradlew || true
+          
+          # Enable AndroidX and Jetifier
+          echo "android.useAndroidX=true" >> gradle.properties
+          echo "android.enableJetifier=true" >> gradle.properties
+          echo "org.gradle.jvmargs=-Xmx2048m" >> gradle.properties
 
       - name: Build Debug APK
         working-directory: ./android-app
